@@ -19,7 +19,20 @@ const __dirname = path.dirname(__filename);
 const yf = new (YahooFinance as any)();
 
 // --- Database Setup ---
-const dbFile = path.join(process.cwd(), 'data.db');
+const isProduction = process.env.NODE_ENV === 'production';
+// On Railway, we will mount a volume at /data
+const dbDir = isProduction ? '/data' : process.cwd();
+const dbFile = path.join(dbDir, 'data.db');
+
+// Ensure directory exists in production if needed (though Railway volumes handle this)
+if (isProduction && !fs.existsSync(dbDir)) {
+  try {
+    fs.mkdirSync(dbDir, { recursive: true });
+  } catch (e) {
+    console.error('Failed to create db directory:', e);
+  }
+}
+
 const db = new Database(dbFile);
 
 // Initialize tables
