@@ -81,11 +81,15 @@ db.exec(`
 `);
 
 // --- Passport Setup ---
+const rawAppUrl = process.env.APP_URL || 'http://localhost:3000';
+const appUrl = rawAppUrl.endsWith('/') ? rawAppUrl.slice(0, -1) : rawAppUrl;
+
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID || 'dummy',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'dummy',
-    callbackURL: `${process.env.APP_URL || 'http://localhost:3000'}/api/auth/google/callback`,
-    scope: ['profile', 'email']
+    callbackURL: `${appUrl}/api/auth/google/callback`,
+    scope: ['profile', 'email'],
+    proxy: true // Required for Railway/Proxies
   },
   (accessToken, refreshToken, profile, done) => {
     const user = {
@@ -123,6 +127,9 @@ passport.deserializeUser((id: string, done) => {
 async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 3000;
+
+  // Railway runs behind a proxy
+  app.set('trust proxy', 1);
 
   app.use(express.json());
   app.use(cookieSession({
