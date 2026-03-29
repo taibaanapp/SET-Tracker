@@ -20,20 +20,27 @@ const yf = new (YahooFinance as any)();
 
 // --- Database Setup ---
 const isProduction = process.env.NODE_ENV === 'production';
-// On Railway, we will mount a volume at /data
 const dbDir = isProduction ? '/data' : process.cwd();
-const dbFile = path.join(dbDir, 'data.db');
+let dbFile = path.join(dbDir, 'data.db');
 
-// Ensure directory exists in production if needed (though Railway volumes handle this)
+// Safety check for production directory
 if (isProduction && !fs.existsSync(dbDir)) {
   try {
     fs.mkdirSync(dbDir, { recursive: true });
   } catch (e) {
-    console.error('Failed to create db directory:', e);
+    console.error('Warning: Could not create /data directory, falling back to local storage.');
+    dbFile = path.join(process.cwd(), 'data.db');
   }
 }
 
-const db = new Database(dbFile);
+let db: any;
+try {
+  db = new Database(dbFile);
+  console.log('Database connected at:', dbFile);
+} catch (e) {
+  console.error('Database connection failed, using fallback:', e);
+  db = new Database('fallback.db');
+}
 
 // Initialize tables
 db.exec(`
@@ -92,26 +99,34 @@ passport.use(new GoogleStrategy({
     proxy: true // Required for Railway/Proxies
   },
   (accessToken, refreshToken, profile, done) => {
-    const user = {
-      id: profile.id,
-      googleId: profile.id,
-      displayName: profile.displayName,
-      email: profile.emails?.[0]?.value || '',
-      photoUrl: profile.photos?.[0]?.value || ''
-    };
+    try {
+      const user = {
+        id: profile.id,
+        googleId: profile.id,
+        displayName: profile.displayName,
+        email: profile.emails?.[0]?.value || '',
+        photoUrl: profile.photos?.[0]?.value || ''
+      };
 
-    const upsertUser = db.prepare(`
-      INSERT INTO users (id, googleId, displayName, email, photoUrl)
-      VALUES (?, ?, ?, ?, ?)
-      ON CONFLICT(googleId) DO UPDATE SET
-        displayName = excluded.displayName,
-        email = excluded.email,
-        photoUrl = excluded.photoUrl
-      RETURNING *
-    `);
-    
-    const result = upsertUser.get(user.id, user.googleId, user.displayName, user.email, user.photoUrl);
-    return done(null, result);
+      console.log('Login attempt for:', user.email);
+
+      const upsertUser = db.prepare(`
+        INSERT INTO users (id, googleId, displayName, email, photoUrl)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          displayName = excluded.displayName,
+          email = excluded.email,
+          photoUrl = excluded.photoUrl
+        RETURNING *
+      `);
+      
+      const result = upsertUser.get(user.id, user.googleId, user.displayName, user.email, user.photoUrl);
+      console.log('Login successful for:', user.email);
+      return done(null, result);
+    } catch (err) {
+      console.error('PASSPORT STRATEGY ERROR:', err);
+      return done(err);
+    }
   }
 ));
 
