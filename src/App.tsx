@@ -119,6 +119,7 @@ const StatCard = ({ title, value, subValue, trend, icon: Icon, theme }: {
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [userCount, setUserCount] = useState<number>(0);
   const [stocks, setStocks] = useState<Stock[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
@@ -190,6 +191,11 @@ export default function App() {
         setIsAuthReady(true);
         setLoading(false);
       });
+
+    fetch('/api/users/count')
+      .then(res => res.json())
+      .then(data => setUserCount(data.count))
+      .catch(err => console.error('Failed to fetch user count:', err));
   }, []);
 
   useEffect(() => {
@@ -645,18 +651,23 @@ export default function App() {
         <div className="w-20 h-20 bg-[#F27D26] rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-[#F27D26]/20">
           <TrendingUp className="w-10 h-10 text-white" />
         </div>
-        <h1 className={cn("text-4xl font-bold mb-4 tracking-tight", theme === 'dark' ? "text-white" : "text-gray-900")}>Thai Stock Tracker</h1>
+        <h1 className={cn("text-4xl font-bold mb-4 tracking-tight", theme === 'dark' ? "text-white" : "text-gray-900")}>SET Tracker พอร์ตหุ้นพันล้าน</h1>
         <p className={cn("mb-8 leading-relaxed", theme === 'dark' ? "text-[#8e9299]" : "text-gray-500")}>
           Monitor your SET portfolio with professional-grade analytics, detailed trade logs, and performance tracking.
         </p>
-        <button 
-          onClick={signIn}
-          className={cn("w-full py-4 font-bold rounded-2xl transition-all flex items-center justify-center gap-3 shadow-xl",
-            theme === 'dark' ? "bg-white text-black hover:bg-gray-200" : "bg-gray-900 text-white hover:bg-black")}
-        >
-          <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
-          Sign in with Google
-        </button>
+        <div className="mb-6 flex flex-col items-center gap-2">
+          <button 
+            onClick={signIn}
+            className={cn("w-full py-4 font-bold rounded-2xl transition-all flex items-center justify-center gap-3 shadow-xl",
+              theme === 'dark' ? "bg-white text-black hover:bg-gray-200" : "bg-gray-900 text-white hover:bg-black")}
+          >
+            <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
+            Sign in with Google
+          </button>
+          <p className={cn("text-[10px] uppercase tracking-[0.2em] font-bold mt-4", theme === 'dark' ? "text-[#5c5f66]" : "text-gray-400")}>
+            Join {userCount} users tracking their wealth
+          </p>
+        </div>
       </motion.div>
     </div>
   );
@@ -671,7 +682,7 @@ export default function App() {
           <div className="w-10 h-10 bg-[#F27D26] rounded-xl flex items-center justify-center shrink-0">
             <TrendingUp className="w-6 h-6 text-white" />
           </div>
-          <span className={cn("hidden md:block font-bold text-xl tracking-tight", theme === 'dark' ? "text-white" : "text-gray-900")}>SET Tracker</span>
+          <span className={cn("hidden md:block font-bold text-xl tracking-tight", theme === 'dark' ? "text-white" : "text-gray-900")}>SET Tracker พอร์ตหุ้นพันล้าน</span>
         </div>
         
         <nav className="flex-1 px-4 py-6 space-y-2">
@@ -707,6 +718,12 @@ export default function App() {
             {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             <span className="hidden md:block font-medium">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
+          <div className={cn(
+            "px-4 py-2 text-[10px] uppercase tracking-widest font-bold",
+            theme === 'dark' ? "text-[#5c5f66]" : "text-gray-400"
+          )}>
+            <span className="hidden md:inline">Total Users: </span>{userCount}
+          </div>
           <button 
             onClick={logout}
             className={cn(

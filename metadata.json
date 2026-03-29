@@ -1,5 +1,5 @@
 {
-  "name": "Thai Stock Portfolio Tracker",
-  "description": "A comprehensive trading log and portfolio management tool for Thai stocks (SET), featuring detailed trade logs, performance analytics, and personal notes.",
+  "name": "SET Tracker พอร์ตหุ้นพันล้าน",
+  "description": "ระบบติดตามพอร์ตหุ้นไทย (SET) สำหรับนักลงทุนมืออาชีพ บันทึกรายการซื้อขาย วิเคราะห์ผลกำไรขาดทุน และติดตามความมั่งคั่งของคุณ",
   "requestFramePermissions": []
 }

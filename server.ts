@@ -189,6 +189,15 @@ async function startServer() {
     res.json(req.user || null);
   });
 
+  app.get('/api/users/count', (req, res) => {
+    try {
+      const row = db.prepare('SELECT COUNT(*) as count FROM users').get();
+      res.json({ count: row.count });
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to count users' });
+    }
+  });
+
   app.get('/api/auth/logout', (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
