@@ -155,6 +155,21 @@ async function startServer() {
     sameSite: 'lax'
   }));
 
+  // Fix for Passport 0.6+ and cookie-session (regenerate/save missing)
+  app.use((req: any, res: any, next: any) => {
+    if (req.session && !req.session.regenerate) {
+      req.session.regenerate = (cb: any) => {
+        cb();
+      };
+    }
+    if (req.session && !req.session.save) {
+      req.session.save = (cb: any) => {
+        cb();
+      };
+    }
+    next();
+  });
+
   app.use(passport.initialize());
   app.use(passport.session());
 
