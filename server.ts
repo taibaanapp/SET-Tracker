@@ -85,6 +85,14 @@ db.exec(`
     FOREIGN KEY(stockId) REFERENCES stocks(id),
     FOREIGN KEY(userId) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS rate_limits (
+    userId TEXT PRIMARY KEY,
+    dailyCount INTEGER DEFAULT 0,
+    lastActionAt INTEGER DEFAULT 0,
+    currentDate TEXT,
+    FOREIGN KEY(userId) REFERENCES users(id)
+  );
 `);
 
 // --- Passport Setup ---
@@ -212,6 +220,44 @@ async function startServer() {
     res.status(401).json({ error: 'Unauthorized' });
   };
 
+  // Rate Limiting Middleware
+  const checkRateLimit = (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated()) return next();
+    
+    const userId = req.user.id;
+    const now = Date.now();
+    const today = new Date().toISOString().split('T')[0];
+    
+    const limit = db.prepare('SELECT * FROM rate_limits WHERE userId = ?').get(userId);
+    
+    if (!limit) {
+      db.prepare('INSERT INTO rate_limits (userId, dailyCount, lastActionAt, currentDate) VALUES (?, ?, ?, ?)')
+        .run(userId, 1, now, today);
+      return next();
+    }
+
+    // Anti-burst: 1 second gap
+    if (now - limit.lastActionAt < 1000) {
+      return res.status(429).json({ error: 'ใจเย็นๆ ครับ ทำรายการเร็วเกินไป (Too many requests)' });
+    }
+
+    let newCount = limit.dailyCount;
+    if (limit.currentDate !== today) {
+      newCount = 1;
+    } else {
+      newCount += 1;
+    }
+
+    if (newCount > 200) {
+      return res.status(429).json({ error: 'วันนี้คุณทำรายการครบ 200 ครั้งแล้ว (Daily limit reached)' });
+    }
+
+    db.prepare('UPDATE rate_limits SET dailyCount = ?, lastActionAt = ?, currentDate = ? WHERE userId = ?')
+      .run(newCount, now, today, userId);
+    
+    next();
+  };
+
   // --- Stock API ---
   app.get('/api/stocks', ensureAuthenticated, (req: any, res) => {
     const stocks = db.prepare('SELECT * FROM stocks WHERE userId = ?').all(req.user.id);
@@ -221,7 +267,7 @@ async function startServer() {
     })));
   });
 
-  app.post('/api/stocks', ensureAuthenticated, (req: any, res) => {
+  app.post('/api/stocks', ensureAuthenticated, checkRateLimit, (req: any, res) => {
     const stock = { ...req.body, id: crypto.randomUUID(), userId: req.user.id };
     const insert = db.prepare(`
       INSERT INTO stocks (id, symbol, name, avgCost, totalShares, currentPrice, lastUpdated, userId, website, domain, industry, pe, pbv, marketCap, freeFloat, dividendYield, history2Y)
@@ -231,7 +277,7 @@ async function startServer() {
     res.json(stock);
   });
 
-  app.patch('/api/stocks/:id', ensureAuthenticated, (req: any, res) => {
+  app.patch('/api/stocks/:id', ensureAuthenticated, checkRateLimit, (req: any, res) => {
     const { id } = req.params;
     const updates = req.body;
     const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ');
@@ -240,7 +286,7 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  app.delete('/api/stocks/:id', ensureAuthenticated, (req: any, res) => {
+  app.delete('/api/stocks/:id', ensureAuthenticated, checkRateLimit, (req: any, res) => {
     const { id } = req.params;
     db.prepare('DELETE FROM trades WHERE stockId = ? AND userId = ?').run(id, req.user.id);
     db.prepare('DELETE FROM stocks WHERE id = ? AND userId = ?').run(id, req.user.id);
@@ -253,7 +299,7 @@ async function startServer() {
     res.json(trades);
   });
 
-  app.post('/api/trades', ensureAuthenticated, (req: any, res) => {
+  app.post('/api/trades', ensureAuthenticated, checkRateLimit, (req: any, res) => {
     const trade = { ...req.body, id: crypto.randomUUID(), userId: req.user.id };
     const insert = db.prepare(`
       INSERT INTO trades (id, stockId, type, shares, price, date, notes, userId)
@@ -263,7 +309,7 @@ async function startServer() {
     res.json(trade);
   });
 
-  app.patch('/api/trades/:id', ensureAuthenticated, (req: any, res) => {
+  app.patch('/api/trades/:id', ensureAuthenticated, checkRateLimit, (req: any, res) => {
     const { id } = req.params;
     const updates = req.body;
     const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ');
@@ -272,7 +318,7 @@ async function startServer() {
     res.json({ success: true });
   });
 
-  app.delete('/api/trades/:id', ensureAuthenticated, (req: any, res) => {
+  app.delete('/api/trades/:id', ensureAuthenticated, checkRateLimit, (req: any, res) => {
     const { id } = req.params;
     db.prepare('DELETE FROM trades WHERE id = ? AND userId = ?').run(id, req.user.id);
     res.json({ success: true });

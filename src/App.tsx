@@ -71,7 +71,20 @@ function handleApiError(error: unknown, operationType: OperationType, path: stri
     path
   }
   console.error('API Error: ', JSON.stringify(errInfo));
+  alert(errInfo.error);
   throw new Error(JSON.stringify(errInfo));
+}
+
+async function apiFetch(url: string, options: RequestInit = {}) {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    if (res.status === 429) {
+      const data = await res.json();
+      throw new Error(data.error || 'Too many requests');
+    }
+    throw new Error(`API Error: ${res.statusText}`);
+  }
+  return res;
 }
 
 // --- Components ---
@@ -180,7 +193,7 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    fetch('/api/auth/user')
+    apiFetch('/api/auth/user')
       .then(res => res.json())
       .then(u => {
         setUser(u);
@@ -192,7 +205,7 @@ export default function App() {
         setLoading(false);
       });
 
-    fetch('/api/users/count')
+    apiFetch('/api/users/count')
       .then(res => res.json())
       .then(data => setUserCount(data.count))
       .catch(err => console.error('Failed to fetch user count:', err));
@@ -208,8 +221,8 @@ export default function App() {
     const fetchData = async () => {
       try {
         const [stocksRes, tradesRes] = await Promise.all([
-          fetch('/api/stocks'),
-          fetch('/api/trades')
+          apiFetch('/api/stocks'),
+          apiFetch('/api/trades')
         ]);
         
         if (stocksRes.ok) setStocks(await stocksRes.json());
@@ -313,7 +326,7 @@ export default function App() {
         return;
       }
 
-      const res = await fetch('/api/stocks', {
+      const res = await apiFetch('/api/stocks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -331,7 +344,7 @@ export default function App() {
       const docData = await res.json();
       
       // Add initial trade log with the specified date
-      await fetch('/api/trades', {
+      await apiFetch('/api/trades', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -362,7 +375,7 @@ export default function App() {
       for (const stock of stocks) {
         const fetchedData = await fetchStockData(stock.symbol);
         if (fetchedData && fetchedData.price > 0) {
-          await fetch(`/api/stocks/${stock.id}`, {
+          await apiFetch(`/api/stocks/${stock.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -376,7 +389,7 @@ export default function App() {
         }
       }
       // Refresh local state
-      const res = await fetch('/api/stocks');
+      const res = await apiFetch('/api/stocks');
       if (res.ok) setStocks(await res.json());
     } catch (err) {
       console.error("Refresh Prices Error:", err);
@@ -449,7 +462,7 @@ export default function App() {
         newTotalShares -= sharesNum;
       }
 
-      await fetch(`/api/stocks/${selectedStockId}`, {
+      await apiFetch(`/api/stocks/${selectedStockId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -459,7 +472,7 @@ export default function App() {
         })
       }).catch(err => handleApiError(err, OperationType.UPDATE, `stocks/${selectedStockId}`));
 
-      await fetch('/api/trades', {
+      await apiFetch('/api/trades', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -476,7 +489,7 @@ export default function App() {
       setSelectedStockId(null);
       
       // Refresh data
-      const [sRes, tRes] = await Promise.all([fetch('/api/stocks'), fetch('/api/trades')]);
+      const [sRes, tRes] = await Promise.all([apiFetch('/api/stocks'), apiFetch('/api/trades')]);
       if (sRes.ok) setStocks(await sRes.json());
       if (tRes.ok) setTrades(await tRes.json());
     } catch (err) {
@@ -492,7 +505,7 @@ export default function App() {
   const confirmDelete = async () => {
     if (!showConfirmDelete) return;
     try {
-      await fetch(`/api/stocks/${showConfirmDelete.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/stocks/${showConfirmDelete.id}`, { method: 'DELETE' });
       setShowConfirmDelete(null);
       setStocks(prev => prev.filter(s => s.id !== showConfirmDelete.id));
     } catch (err) {
@@ -532,7 +545,7 @@ export default function App() {
         }
       }
 
-      await fetch(`/api/stocks/${editingStock.id}`, {
+      await apiFetch(`/api/stocks/${editingStock.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -548,7 +561,7 @@ export default function App() {
       });
 
       setEditingStock(null);
-      const res = await fetch('/api/stocks');
+      const res = await apiFetch('/api/stocks');
       if (res.ok) setStocks(await res.json());
     } catch (err) {
       console.error("Update Stock Error:", err);
@@ -559,7 +572,7 @@ export default function App() {
 
   const recalculateStock = async (stockId: string) => {
     try {
-      const res = await fetch('/api/trades');
+      const res = await apiFetch('/api/trades');
       const allTrades: Trade[] = await res.json();
       const stockTrades = allTrades.filter(t => t.stockId === stockId);
       
@@ -580,7 +593,7 @@ export default function App() {
       
       const avgCost = totalShares > 0 ? totalCost / totalShares : 0;
       
-      await fetch(`/api/stocks/${stockId}`, {
+      await apiFetch(`/api/stocks/${stockId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -591,7 +604,7 @@ export default function App() {
       });
 
       // Refresh data
-      const [sRes, tRes] = await Promise.all([fetch('/api/stocks'), fetch('/api/trades')]);
+      const [sRes, tRes] = await Promise.all([apiFetch('/api/stocks'), apiFetch('/api/trades')]);
       if (sRes.ok) setStocks(await sRes.json());
       if (tRes.ok) setTrades(await tRes.json());
     } catch (err) {
@@ -603,7 +616,7 @@ export default function App() {
     if (!showConfirmDeleteTrade) return;
     try {
       const stockId = showConfirmDeleteTrade.stockId;
-      await fetch(`/api/trades/${showConfirmDeleteTrade.id}`, { method: 'DELETE' });
+      await apiFetch(`/api/trades/${showConfirmDeleteTrade.id}`, { method: 'DELETE' });
       await recalculateStock(stockId);
       setShowConfirmDeleteTrade(null);
     } catch (err) {
@@ -615,7 +628,7 @@ export default function App() {
     e.preventDefault();
     if (!user || !editingTrade) return;
     try {
-      await fetch(`/api/trades/${editingTrade.id}`, {
+      await apiFetch(`/api/trades/${editingTrade.id}`, {
         method: 'PATCH', // Note: I need to implement PATCH for trades in server.ts if I use it
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

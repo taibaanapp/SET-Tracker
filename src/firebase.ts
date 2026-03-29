@@ -6,6 +6,10 @@ export const fetchStockData = async (symbol: string, date?: string) => {
     
     const response = await fetch(url.toString());
     if (!response.ok) {
+      if (response.status === 429) {
+        const data = await response.json();
+        alert(data.error || 'Too many requests');
+      }
       throw new Error('Failed to fetch stock data');
     }
     const data = await response.json();
