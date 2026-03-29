@@ -1,0 +1,5 @@
+{
+  "name": "Thai Stock Portfolio Tracker",
+  "description": "A comprehensive trading log and portfolio management tool for Thai stocks (SET), featuring detailed trade logs, performance analytics, and personal notes.",
+  "requestFramePermissions": []
+}
