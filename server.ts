@@ -159,7 +159,9 @@ async function startServer() {
   app.use(passport.session());
 
   // --- Auth Routes ---
-  app.get('/api/auth/google', passport.authenticate('google'));
+  app.get('/api/auth/google', passport.authenticate('google', { 
+    prompt: 'select_account' 
+  }));
 
   app.get('/api/auth/google/callback', 
     passport.authenticate('google', { failureRedirect: '/login' }),
@@ -172,8 +174,10 @@ async function startServer() {
     res.json(req.user || null);
   });
 
-  app.get('/api/auth/logout', (req, res) => {
-    req.logout(() => {
+  app.get('/api/auth/logout', (req, res, next) => {
+    req.logout((err) => {
+      if (err) return next(err);
+      req.session = null; // Clear session cookie
       res.redirect('/');
     });
   });
@@ -353,6 +357,12 @@ async function startServer() {
 
   app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`Server running on port ${PORT}`);
+  });
+
+  // Global error handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('GLOBAL ERROR:', err);
+    res.status(500).send('Internal Server Error: ' + err.message);
   });
 }
 
